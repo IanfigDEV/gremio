@@ -2,13 +2,14 @@ from flask import Flask, render_template, request, redirect, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from pymongo import MongoClient
 from bson.objectid import ObjectId
+from bson.errors import InvalidId
 import os
 
 app = Flask(__name__)
 app.secret_key = 'secreto'
 
 # Conexão MongoDB (pegue a string da variável de ambiente no Render)
-mongo_uri = os.getenv('MONGO_URI') or "mongodb+srv://figueiredoian7:<figueiredoian7>@cluster1.bdw7trb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster1"
+mongo_uri = os.getenv('MONGO_URI') or "mongodb+srv://figueiredoian7:24u1t00cN2Mesf6r@cluster1.bdw7trb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster1"
 client = MongoClient(mongo_uri)
 db = client.meubanco
 
@@ -64,17 +65,23 @@ def login():
 
     return render_template("login.html", erro=erro)
 
-# Dashboard cliente
 @app.route("/dashboard")
 def dashboard():
     if "usuario_id" not in session or session.get("is_admin"):
         return redirect("/login")
-    usuario = users_col.find_one({"_id": ObjectId(session["usuario_id"])})
+
+    try:
+        usuario = users_col.find_one({"_id": ObjectId(session["usuario_id"])})
+    except InvalidId:
+        session.clear()
+        return redirect("/login")
+
     if not usuario:
         session.clear()
         return redirect("/login")
 
     return render_template("client_dashboard.html", usuario=usuario)
+
 
 # Admin
 @app.route("/admin")
