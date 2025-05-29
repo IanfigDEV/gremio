@@ -1,4 +1,3 @@
-# No topo do main.py
 import pandas as pd
 from io import BytesIO
 from flask import send_file
@@ -43,15 +42,28 @@ def login():
     
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-        if request.method == 'POST':
+    if request.method == 'POST':
+        try:
             matricula = request.form['matricula']
             nome = request.form['nome']
             senha = request.form['senha']
+
             if matricula not in users:
-                users[matricula] = {'nome': nome, 'senha': senha, 'tipo': 'cliente', 'senha_temporaria': True}
+                users[matricula] = {
+                    'nome': nome,
+                    'senha': senha,
+                    'tipo': 'cliente',
+                    'senha_temporaria': True
+                }
                 return redirect(url_for('login'))
+
             return 'Matrícula já cadastrada', 400
-        return render_template('register.html')
+
+        except Exception as e:
+            return f"Ocorreu um erro: {str(e)}", 500
+
+    return render_template('register.html')
+
 
 @app.route('/trocar_senha', methods=['GET', 'POST'])
 def trocar_senha():
