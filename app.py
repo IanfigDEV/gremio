@@ -8,7 +8,7 @@ app = Flask(__name__)
 app.secret_key = 'secreto'
 
 # Conexão MongoDB (pegue a string da variável de ambiente no Render)
-mongo_uri = os.getenv('MONGO_URI') or "mongodb+srv://figueiredoian7:<547403Ian>@cluster1.bdw7trb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster1"
+mongo_uri = os.getenv('MONGO_URI') or "mongodb+srv://figueiredoian7:<figueiredoian7>@cluster1.bdw7trb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster1"
 client = MongoClient(mongo_uri)
 db = client.meubanco
 
