@@ -1,34 +1,25 @@
 from flask import Flask, render_template, request, redirect, session
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_sqlalchemy import SQLAlchemy
+from pymongo import MongoClient
+from bson.objectid import ObjectId
 import os
 
-# Configurações básicas do Flask
 app = Flask(__name__)
 app.secret_key = 'secreto'
 
-# Configurações do banco de dados
-basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'instance', 'banco.db')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# Conexão MongoDB (pegue a string da variável de ambiente no Render)
+mongo_uri = os.getenv('MONGO_URI') or "mongodb+srv://figueiredoian7:2233@cluster1.bdw7trb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster1"
+client = MongoClient(mongo_uri)
+db = client.meubanco
 
-# Inicializa o SQLAlchemy
-db = SQLAlchemy(app)
-
-# Modelo de usuário
-class Usuario(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    matricula = db.Column(db.String(50), unique=True, nullable=False)
-    nome = db.Column(db.String(100), nullable=False)
-    senha = db.Column(db.String(100), nullable=False)
-    is_admin = db.Column(db.Boolean, default=False)
+users_col = db.users  # coleção users
 
 # Rota inicial
 @app.route("/")
 def index():
     return redirect("/login")
 
-# Registro de novo usuário
+# Registro
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
@@ -37,13 +28,17 @@ def register():
         senha = request.form["senha"]
         is_admin = request.form.get("is_admin") == "on"
 
-        if Usuario.query.filter_by(matricula=matricula).first():
+        # Verifica se já existe usuário com essa matrícula
+        if users_col.find_one({"matricula": matricula}):
             return "Usuário já existe."
 
         senha_hash = generate_password_hash(senha)
-        novo_usuario = Usuario(matricula=matricula, nome=nome, senha=senha_hash, is_admin=is_admin)
-        db.session.add(novo_usuario)
-        db.session.commit()
+        users_col.insert_one({
+            "matricula": matricula,
+            "nome": nome,
+            "senha": senha_hash,
+            "is_admin": is_admin
+        })
         return redirect("/login")
 
     return render_template("register.html")
@@ -56,10 +51,11 @@ def login():
         matricula = request.form["matricula"]
         senha = request.form["senha"]
 
-        usuario = Usuario.query.filter_by(matricula=matricula).first()
-        if usuario and check_password_hash(usuario.senha, senha):
-            session["usuario_id"] = usuario.id
-            if usuario.is_admin:
+        usuario = users_col.find_one({"matricula": matricula})
+        if usuario and check_password_hash(usuario["senha"], senha):
+            session["usuario_id"] = str(usuario["_id"])
+            session["is_admin"] = usuario.get("is_admin", False)
+            if session["is_admin"]:
                 return redirect("/admin")
             else:
                 return redirect("/dashboard")
@@ -68,28 +64,26 @@ def login():
 
     return render_template("login.html", erro=erro)
 
-# Dashboard para cliente
+# Dashboard cliente
 @app.route("/dashboard")
 def dashboard():
-    if "usuario_id" not in session:
+    if "usuario_id" not in session or session.get("is_admin"):
         return redirect("/login")
-
-    usuario = Usuario.query.get(session["usuario_id"])
-    if not usuario or usuario.is_admin:
-        session.pop("usuario_id", None)
+    usuario = users_col.find_one({"_id": ObjectId(session["usuario_id"])})
+    if not usuario:
+        session.clear()
         return redirect("/login")
 
     return render_template("client_dashboard.html", usuario=usuario)
 
-# Painel do admin
+# Admin
 @app.route("/admin")
 def admin():
-    if "usuario_id" not in session:
+    if "usuario_id" not in session or not session.get("is_admin"):
         return redirect("/login")
-
-    usuario = Usuario.query.get(session["usuario_id"])
-    if not usuario or not usuario.is_admin:
-        session.pop("usuario_id", None)
+    usuario = users_col.find_one({"_id": ObjectId(session["usuario_id"])})
+    if not usuario:
+        session.clear()
         return redirect("/login")
 
     return render_template("admin.html", usuario=usuario)
@@ -97,41 +91,37 @@ def admin():
 # Logout
 @app.route("/logout")
 def logout():
-    session.pop("usuario_id", None)
+    session.clear()
     return redirect("/login")
 
-# Esqueci minha senha
+# Esqueci senha
 @app.route("/esqueci_senha", methods=["GET", "POST"])
 def esqueci_senha():
     if request.method == "POST":
         matricula = request.form["matricula"]
-        usuario = Usuario.query.filter_by(matricula=matricula).first()
+        usuario = users_col.find_one({"matricula": matricula})
         if usuario:
             return redirect(f"/troca_senha?matricula={matricula}")
         else:
             return "Usuário não encontrado."
     return render_template("esqueci_senha.html")
 
-# Troca de senha
+# Troca senha
 @app.route("/troca_senha", methods=["GET", "POST"])
 def troca_senha():
     matricula = request.args.get("matricula")
 
     if request.method == "POST":
         nova_senha = request.form["nova_senha"]
-        usuario = Usuario.query.filter_by(matricula=matricula).first()
-
-        if usuario:
-            usuario.senha = generate_password_hash(nova_senha)
-            db.session.commit()
+        senha_hash = generate_password_hash(nova_senha)
+        resultado = users_col.update_one({"matricula": matricula}, {"$set": {"senha": senha_hash}})
+        if resultado.matched_count:
             return redirect("/login")
         else:
             return "Usuário não encontrado."
 
     return render_template("troca_senha.html", matricula=matricula)
 
-# Execução do app
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
     app.run(host='0.0.0.0', port=3000, debug=True)
