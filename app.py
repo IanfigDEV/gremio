@@ -65,7 +65,7 @@ def login():
 
     return render_template("login.html", erro=erro)
 
-@app.route("/dashboard")
+@app.route("/dashboard", methods=["GET", "POST"])
 def dashboard():
     if "usuario_id" not in session or session.get("is_admin"):
         return redirect("/login")
@@ -80,7 +80,31 @@ def dashboard():
         session.clear()
         return redirect("/login")
 
-    return render_template("client_dashboard.html", usuario=usuario)
+    # Dados fictícios para evitar erro no template
+    meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio"]
+    gastos = []
+    total = 0.0
+    mes_selecionado = None
+
+    if request.method == "POST":
+        mes_selecionado = request.form["mes"]
+
+        # Aqui você buscaria os dados reais do banco baseado no mês e no usuário
+        # Exemplo fictício:
+        gastos = [
+            ("01/05/2025", "Produto A", 29.99, 2),
+            ("10/05/2025", "Produto B", 15.50, 1),
+        ]
+        total = sum(g[2] for g in gastos)
+
+    return render_template(
+        "client_dashboard.html",
+        usuario=usuario,
+        gastos=gastos,
+        total=total,
+        meses=meses,
+        mes_selecionado=mes_selecionado
+    )
 
 
 # Admin
