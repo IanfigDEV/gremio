@@ -8,12 +8,30 @@ import os
 app = Flask(__name__)
 app.secret_key = 'secreto'
 
-# Conexão MongoDB (pegue a string da variável de ambiente no Render)
+
+# Conexão MongoDB
 mongo_uri = os.getenv('MONGO_URI') or "mongodb+srv://figueiredoian7:24u1t00cN2Mesf6r@cluster1.bdw7trb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster1"
 client = MongoClient(mongo_uri)
 db = client.meubanco
+users_col = db.users
 
-users_col = db.users  # coleção users
+# Função para garantir que o admin exista no banco com senha hash
+def garantir_admin():
+    admin = users_col.find_one({"matricula": "123456"})
+    if not admin:
+        senha_hash = generate_password_hash("admin")
+        users_col.insert_one({
+            "matricula": "123456",
+            "nome": "Administrador",
+            "senha": senha_hash,
+            "is_admin": True
+        })
+        print("Admin criado com senha hash")
+    else:
+        print("Admin já existe")
+
+garantir_admin()
+
 
 # Rota inicial
 @app.route("/")
@@ -53,6 +71,7 @@ def login():
         senha = request.form["senha"]
 
         usuario = users_col.find_one({"matricula": matricula})
+
         if usuario and check_password_hash(usuario["senha"], senha):
             session["usuario_id"] = str(usuario["_id"])
             session["is_admin"] = usuario.get("is_admin", False)
