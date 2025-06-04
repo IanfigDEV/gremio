@@ -127,8 +127,8 @@ def dashboard():
 
 
 # Admin
-@app.route("/admin")
-def admin():
+@app.route("/admin", endpoint="admin")
+def admin_panel():
     if "usuario_id" not in session or not session.get("is_admin"):
         return redirect("/login")
 
