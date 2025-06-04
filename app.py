@@ -131,12 +131,25 @@ def dashboard():
 def admin():
     if "usuario_id" not in session or not session.get("is_admin"):
         return redirect("/login")
+
     usuario = users_col.find_one({"_id": ObjectId(session["usuario_id"])})
     if not usuario:
         session.clear()
         return redirect("/login")
 
-    return render_template("admin.html", usuario=usuario)
+    # Exemplo de estruturas (ajuste conforme seu banco):
+    produtos = db.produtos.find()  # Supondo que você tenha uma coleção 'produtos'
+    compras_hoje = db.compras.find({"data": "03/06/2025"})  # ou use datetime.date.today().strftime("%d/%m/%Y")
+    users = {u["matricula"]: u for u in users_col.find()}
+
+    return render_template(
+        "admin.html",
+        usuario=usuario,
+        produtos=produtos,
+        compras_hoje=compras_hoje,
+        users=users,
+        meses=["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+    )
 
 # Logout
 @app.route("/logout")
